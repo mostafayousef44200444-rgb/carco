@@ -1,0 +1,14 @@
+{
+  "name": "carco-backend",
+  "install": "npm ci --legacy-peer-deps",
+  "build": "npm run build",
+  "start": "npm run start:prod",
+  "env": [
+    "PORT",
+    "MONGO_URI",
+    "JWT_SECRET",
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET"
+  ]
+}
