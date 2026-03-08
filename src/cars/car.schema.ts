@@ -52,7 +52,8 @@ export class Car {
 
   @Prop()
   year?: number;
-
+@Prop()
+kilometers?: number;
   @Prop()
   color?: string;
 

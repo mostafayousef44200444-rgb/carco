@@ -13,96 +13,95 @@ export class CarsuserService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  // رفع عربية جديدة
+  // أي مستخدم مسجل يمكنه إنشاء عربية
   async create(createCaruserDto: CreateCarsuserDto, files: Express.Multer.File[], ownerId: string) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException('At least one image is required');
-    }
+    if (!ownerId) throw new ForbiddenException('User not authenticated');
+    if (!files || files.length === 0) throw new BadRequestException('At least one image is required');
 
-    if (createCaruserDto.price <= 0) {
-      throw new BadRequestException('Price must be greater than zero');
-    }
-    if (createCaruserDto.doors && createCaruserDto.doors <= 0) {
-      throw new BadRequestException('Doors must be greater than zero');
-    }
+    const images = await Promise.all(
+      files.map(f => {
+        if (!f.buffer) throw new BadRequestException('Invalid file upload');
+        return this.cloudinaryService.uploadBuffer(f.buffer);
+      }),
+    );
 
-    const images = await Promise.all(files.map(f => this.cloudinaryService.uploadBuffer(f.buffer)));
     const addedDate = createCaruserDto.addedDate || new Date();
 
-    return this.caruserModel.create({ ...createCaruserDto, images, addedDate, owner: ownerId });
+    return this.caruserModel.create({
+      ...createCaruserDto,
+      images,
+      addedDate,
+      owner: ownerId,
+      ownerName: createCaruserDto.ownerName || 'Unknown',
+      ownerPhone: createCaruserDto.ownerPhone || 'Unknown',
+    });
   }
 
-  // جلب كل عربيات المستخدم مع فلترة و pagination
+  // جلب كل العربيات مع فلترة و pagination
   async findAll(ownerId: string, query?: any) {
     const page = query?.page || 1;
     const limit = query?.limit || 10;
     const skip = (page - 1) * limit;
 
     const filter: any = { owner: ownerId };
-
     if (query?.type) filter.type = query.type;
-    if (query?.operationType) filter.operationType = query.operationType;
     if (query?.minPrice || query?.maxPrice) {
       filter.price = {};
       if (query.minPrice) filter.price.$gte = query.minPrice;
       if (query.maxPrice) filter.price.$lte = query.maxPrice;
     }
-    if (query?.search) {
-      filter.name = { $regex: query.search, $options: 'i' };
-    }
+    if (query?.search) filter.name = { $regex: query.search, $options: 'i' };
 
     const cars = await this.caruserModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit);
     const total = await this.caruserModel.countDocuments(filter);
-
     return { total, page, limit, cars };
   }
 
-  // جلب عربية واحدة والتأكد من ملكية المستخدم
-  async findOne(id: string, ownerId: string) {
-    const car = await this.caruserModel.findOne({ _id: id, owner: ownerId });
-    if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
-    return car;
-  }
-
-  // تحديث عربية
+  // تعديل عربية – فقط المالك
   async update(id: string, updateCaruserDto: UpdateCarsuserDto, files: Express.Multer.File[], ownerId: string) {
-    const car = await this.findOne(id, ownerId);
+    const car = await this.caruserModel.findById(id);
+    if (!car) throw new NotFoundException('Car not found');
+    if (car.owner.toString() !== ownerId) throw new ForbiddenException('You cannot edit this car');
 
     let images: string[] = [];
-
     if (files?.length) {
       const uploaded = await Promise.all(files.map(f => this.cloudinaryService.uploadBuffer(f.buffer)));
       images.push(...uploaded);
     }
-
-    if (updateCaruserDto.existingImages) {
-      images.push(...updateCaruserDto.existingImages);
-    }
-
-    if (updateCaruserDto.price && updateCaruserDto.price <= 0) {
-      throw new BadRequestException('Price must be greater than zero');
-    }
-    if (updateCaruserDto.doors && updateCaruserDto.doors <= 0) {
-      throw new BadRequestException('Doors must be greater than zero');
-    }
+    if (updateCaruserDto.existingImages) images.push(...updateCaruserDto.existingImages);
 
     Object.assign(car, { ...updateCaruserDto, images });
     return car.save();
   }
 
-  // حذف عربية
-  async remove(id: string, ownerId: string) {
-    const car = await this.caruserModel.findOneAndDelete({ _id: id, owner: ownerId });
-    if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
-    return { message: 'Car deleted successfully' };
+ // إضافة findOne
+// carsuser.service.ts
+async findOne(id: string, ownerId: string) {
+  const car = await this.caruserModel.findById(id);
+  if (!car) throw new NotFoundException('Car not found');
+
+  // تحقق من الملكية
+  if (car.owner.toString() !== ownerId) {
+    throw new ForbiddenException('You cannot view this car');
   }
 
-  // جلب كل العربيات اللي رفعها المستخدم (لواجهة "عربياتي")
+  return car;
+}
+
+// تعديل remove
+async remove(id: string, ownerId: string) {
+  const car = await this.caruserModel.findById(id);
+  if (!car) throw new NotFoundException('Car not found');
+  if (car.owner.toString() !== ownerId) throw new ForbiddenException('You cannot delete this car');
+
+  await this.caruserModel.findByIdAndDelete(id);
+  return { message: 'Car deleted successfully' };
+}
+
   async findUserCars(userId: string) {
     return this.caruserModel.find({ owner: userId }).sort({ createdAt: -1 });
   }
 
-  // جلب كل العربيات المعروضة للبيع من جميع المستخدمين
   async findAllForSale() {
     return this.caruserModel.find().sort({ createdAt: -1 });
   }

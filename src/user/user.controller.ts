@@ -4,7 +4,7 @@ import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 
-@Controller('api/users')
+@Controller('users')
 export class UserController {
   constructor(private userService: UserService) {}
 

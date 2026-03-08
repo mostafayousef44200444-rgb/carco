@@ -93,6 +93,9 @@ export class CreateCarsuserDto {
   @IsNumber()
   @IsOptional()
   year?: number;
+@IsNumber()
+  @IsOptional()
+kilometers?: number;
 
   @IsString()
   @IsOptional()

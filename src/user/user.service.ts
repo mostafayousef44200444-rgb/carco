@@ -1,4 +1,3 @@
-// src/user/user.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -16,30 +15,35 @@ export class UserService {
     const exists = await this.userModel.findOne({ email: dto.email });
     if (exists) throw new BadRequestException('البريد الإلكتروني مستخدم من قبل');
 
+    // ملاحظة: لا نشفر هنا يدويًا لأن UserSchema.pre('save') سيفعل ذلك
     const user = await this.userModel.create(dto);
-   const token = this.generateToken(user._id.toString(), user.role);
 
-    return { user, token };
+    const token = this.generateToken(user._id.toString(), user.role);
+    const { password: _, ...userResponse } = user.toObject();
+
+    return { user: userResponse, token };
   }
 
- async login(dto: LoginUserDto) {
-  const user = await this.userModel.findOne({ email: dto.email });
-  if (!user) throw new NotFoundException('بيانات الدخول غير صحيحة');
+  async login(dto: LoginUserDto) {
+    const user = await this.userModel.findOne({ email: dto.email });
+    if (!user) throw new NotFoundException('بيانات الدخول غير صحيحة');
 
-  // استخدم bcrypt مباشرة
-  const isMatch = await bcrypt.compare(dto.password, user.password);
-  if (!isMatch) throw new NotFoundException('بيانات الدخول غير صحيحة');
+    const isMatch = await bcrypt.compare(dto.password, user.password);
+    if (!isMatch) throw new NotFoundException('بيانات الدخول غير صحيحة');
 
-  const token = this.generateToken(user._id.toString(), user.role);
+    const token = this.generateToken(user._id.toString(), user.role);
+    const { password: _, ...userResponse } = user.toObject();
 
-  return { user, token };
-}
-
-  async findAll() {
-    return this.userModel.find({}, '-password');
+    return { user: userResponse, token };
   }
 
   private generateToken(id: string, role: string) {
-    return jwt.sign({ id, role }, process.env.JWT_SECRET!, { expiresIn: '8d' });
+    const secret = process.env.JWT_SECRET || 'your_secret_key_123';
+    // نستخدم id ليتطابق مع ما يقرأه الأنجولار
+    return jwt.sign({ id, role }, secret, { expiresIn: '8d' });
+  }
+
+  async findAll() {
+    return this.userModel.find({}, '-password').exec();
   }
 }

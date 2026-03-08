@@ -1,44 +1,75 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from './order.schema';
-import { Car, CarDocument } from '../cars/car.schema'; // تأكد من المسار
-import { Caruser, CaruserDocument } from '../carsuser/carsuser.schema'; // تأكد من المسار
-import { CreateOrderDto } from './dto/create-order.dto';
 
 @Injectable()
 export class OrderService {
   constructor(
-    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
-    @InjectModel(Car.name) private carModel: Model<CarDocument>,
-    @InjectModel(Caruser.name) private caruserModel: Model<CaruserDocument>,
+    @InjectModel(Order.name) private orderModel: Model<OrderDocument>
   ) {}
 
-  async createOrder(userId: string, dto: CreateOrderDto) {
-    const { productId, productModel } = dto;
-
-    // إصلاح error الـ findById عن طريق تحديد الـ Model بدقة
-    const model: Model<any> = productModel === 'Car' ? this.carModel : this.caruserModel;
-    const car = await model.findById(productId);
-    
-    if (!car) throw new NotFoundException('Car not found');
-
+  // 1. الدالة الموجودة عندك (إنشاء طلب جديد)
+  async createOrder(userId: string, dto: any) {
     const newOrder = new this.orderModel({
       ...dto,
       user: new Types.ObjectId(userId),
-      productId: new Types.ObjectId(productId),
+      customerDetails: {
+        fullName: dto.customerDetails?.fullName || 'غير مسجل',
+        email: dto.customerDetails?.email || 'غير مسجل',
+        phone: dto.customerDetails?.phone || 'غير مسجل',
+        address: dto.customerDetails?.address || 'غير مسجل',
+        city: dto.customerDetails?.city || ''
+      },
       status: 'pending',
-      statusHistory: [{ status: 'pending', note: 'Order created' }],
+      statusHistory: [{ status: 'pending', note: 'Order created', at: new Date() }]
     });
-
     return newOrder.save();
   }
 
+  // 2. ✅ الدالة الجديدة (تحديث طلب موجود ببيانات الـ Checkout)
+  async updateOrder(orderId: string, dto: any) {
+    return this.orderModel.findByIdAndUpdate(
+      orderId,
+      { 
+        $set: { 
+          customerDetails: dto.customerDetails, // هنا بنحط البيانات اللي مصطفى كتبها في الفورم
+          payment: dto.payment,
+          status: 'pending' 
+        },
+        $push: { statusHistory: { status: 'updated', note: 'Customer details added via checkout', at: new Date() } }
+      },
+      { new: true } // يرجع الطلب بعد التعديل
+    ).exec();
+  }
+
   async getUserOrders(userId: string, page: number = 1, limit: number = 10) {
-    return this.orderModel.find({ user: new Types.ObjectId(userId) })
+    return this.orderModel
+      .find({ user: new Types.ObjectId(userId) })
+      .populate('user', 'firstName lastName email')
       .populate('productId')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .exec();
   }
+  // دالة جديدة لجلب كل الطلبات للأدمن
+async getAllOrdersForAdmin() {
+  return this.orderModel
+    .find() // هنا شيلنا الفلترة عشان نجيب كل حاجة
+    .populate('user', 'firstName lastName email')
+    .populate('productId')
+    .sort({ createdAt: -1 })
+    .exec();
+}
+async updateOrderStatus(orderId: string, status: string) {
+  return this.orderModel.findByIdAndUpdate(
+    orderId,
+    { 
+      $set: { status: status },
+      $push: { statusHistory: { status: status, at: new Date(), note: `Status updated by Admin` } }
+    },
+    { new: true }
+  );
+}
 }

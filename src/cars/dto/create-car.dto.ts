@@ -12,6 +12,10 @@ export class CreateCarDto {
   @IsOptional()
   description?: string;
 
+@IsNumber()
+  @IsOptional()
+kilometers?: number;
+
   @IsNumber()
   price: number;
 

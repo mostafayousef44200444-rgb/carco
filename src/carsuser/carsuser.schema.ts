@@ -1,16 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { User } from '../user/user.schema';
 
 export type CaruserDocument = Caruser & Document;
 
 @Schema({ timestamps: true })
 export class Caruser {
-  // الصور
   @Prop({ type: [String], required: true })
   images: string[];
 
-  // بيانات أساسية عن العربية
   @Prop({ required: true })
   name: string;
 
@@ -23,21 +20,21 @@ export class Caruser {
   @Prop({ enum: ['Sale', 'Rent'], required: true })
   type: 'Sale' | 'Rent';
 
- 
   @Prop()
-  status?: string; // حالة الإعلان: active / pending / sold
-
+  status?: string;
+@Prop()
+kilometers?: number;
   @Prop()
   addedDate?: Date;
 
   @Prop()
-  factoryCondition?: string; // حالة المصنع أو جديدة / مستعملة
+  factoryCondition?: string;
 
   @Prop()
   doors?: number;
 
   @Prop()
-  modification?: string; // أي تعديل حصل على العربية
+  modification?: string;
 
   @Prop()
   horsepower?: number;
@@ -58,9 +55,8 @@ export class Caruser {
   color?: string;
 
   @Prop({ type: [String] })
-  features?: string[]; // مميزات إضافية
+  features?: string[];
 
-  // 🏠 بيانات المالك (مستخدم)
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   owner: string;
 
@@ -73,10 +69,8 @@ export class Caruser {
   @Prop()
   ownerEmail?: string;
 
- // الشكل اللي بيعمل المشكلة غالباً
-@Prop({ type: Object })
-ownerAddress: any;
-  };
-
+  @Prop({ type: Object, required: false })
+  ownerAddress?: any;
+}
 
 export const CaruserSchema = SchemaFactory.createForClass(Caruser);

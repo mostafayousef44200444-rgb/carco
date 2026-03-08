@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { CarsuserService } from './carsuser.service';
 import { CreateCarsuserDto } from './dto/create-carsuser.dto';
@@ -19,67 +20,70 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth/jwt-auth.guard';
 
 @Controller('carsuser')
-@UseGuards(JwtAuthGuard)
 export class CarsuserController {
   constructor(private readonly carsuserService: CarsuserService) {}
 
-  // رفع عربية
+  // 1. جلب سيارات الشخص المسجل حالياً (يجب أن تكون قبل :id لضمان عدم التداخل)
+  @UseGuards(JwtAuthGuard)
+  @Get('my/cars')
+  async getMyCars(@Req() req) {
+    // استخراج الـ ID من التوكن (تأكدنا من الحالات المختلفة لاسم الحقل)
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    
+    if (!userId) {
+      throw new ForbiddenException('لم يتم العثور على هوية المستخدم');
+    }
+    
+    // استدعاء الخدمة (تم تصحيح الحرف الصغير)
+    return this.carsuserService.findUserCars(userId);
+  }
+
+  // 2. إنشاء عربية جديدة
+  @UseGuards(JwtAuthGuard)
   @Post()
-    @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images', 5))
-  create(@Body() dto: CreateCarsuserDto, @UploadedFiles() files: Express.Multer.File[], @Req() req) {
-    const ownerId = req.user.userId;
+  create(
+    @Body() dto: CreateCarsuserDto,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Req() req,
+  ) {
+    const ownerId = req.user?.id || req.user?.userId;
     return this.carsuserService.create(dto, files, ownerId);
   }
 
-  // جلب كل عربيات المستخدم
-  @Get()
-  
-  findAll(@Req() req, @Query() query) {
-    const ownerId = req.user.userId;
-    return this.carsuserService.findAll(ownerId, query);
+  // 3. جلب كل العربيات للبيع (للعامة)
+  @Get('all-for-sale')
+  getAllForSale() {
+    return this.carsuserService.findAllForSale();
   }
 
-  // جلب عربية واحدة
+  // 4. جلب تفاصيل عربية معينة
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  
   findOne(@Param('id') id: string, @Req() req) {
-    const ownerId = req.user.userId;
+    const ownerId = req.user?.id || req.user?.userId;
     return this.carsuserService.findOne(id, ownerId);
   }
 
-  // تحديث عربية
+  // 5. تعديل عربية
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
-    @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images', 5))
   update(
     @Param('id') id: string,
     @Body() dto: UpdateCarsuserDto,
     @UploadedFiles() files: Express.Multer.File[],
-    @Req() req
+    @Req() req,
   ) {
-    const ownerId = req.user.userId;
+    const ownerId = req.user?.id || req.user?.userId;
     return this.carsuserService.update(id, dto, files, ownerId);
   }
 
-  // حذف عربية
+  // 6. حذف عربية
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-    @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string, @Req() req) {
-    const ownerId = req.user.userId;
+    const ownerId = req.user?.id || req.user?.userId;
     return this.carsuserService.remove(id, ownerId);
-  }
-
-  // واجهة "عربياتي" - كل العربيات الخاصة بالمستخدم
-  @Get('my/cars')
-  getMyCars(@Req() req) {
-    const ownerId = req.user.userId;
-    return this.carsuserService.findUserCars(ownerId);
-  }
-
-  // واجهة "كل العربيات المعروضة للبيع"
-  @Get('all-for-sale')
-  getAllForSale() {
-    return this.carsuserService.findAllForSale();
   }
 }
