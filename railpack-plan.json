@@ -1,8 +1,8 @@
 {
   "name": "carco-backend",
-  "install": "npm ci --omit=dev",
-  "build": "npx nest build",
-  "start": "node dist/main",
+  "install": "npm install --legacy-peer-deps",
+  "build": "npm run build",
+  "start": "npm run start:prod",
   "env": [
     "PORT",
     "MONGO_URI",
@@ -10,6 +10,5 @@
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET"
-  ],
-  "cache": ["node_modules", "package-lock.json"]
+  ]
 }
