@@ -1,6 +1,6 @@
 {
   "name": "carco-backend",
-  "install": "npm install --legacy-peer-deps",
+ "install": "npm ci --legacy-peer-deps",
   "build": "npm run build",
   "start": "npm run start:prod",
   "env": [
